@@ -2,8 +2,8 @@
 // ✅ نسخة Lite: تعمل على Vercel حتى بدون Postgres/Redis.
 // الهدف: إنجاح اختبار register الآن ثم نعيد ربط القاعدة لاحقًا.
 
-import { hashKey } from "../../_lib/hmac.js";
-import { readJson } from "../../_lib/read-json.js";
+import { hashKey } from "../_lib/hmac.js";
+import { readJson } from "../_lib/read-json.js";
 
 export default async function handler(req, res) {
   // 1) السماح لـ POST فقط
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
   // 5) محاولة حفظ نسخة بالكاش (اختياري — لا نفشل إذا غاب Upstash)
   try {
-    const mod = await import("../../_lib/cache.js").catch(() => null);
+    const mod = await import("../_lib/cache.js").catch(() => null);
     if (mod?.cacheSet) {
       await mod.cacheSet(`resolve:${key_hash}`, { wallet_id, provider_id, anchor_id }, 300); // 5 دقائق
     }
