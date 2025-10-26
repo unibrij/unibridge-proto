@@ -1,11 +1,18 @@
+// upstash.js - مكتبة Redis للكاش باستخدام Upstash
 import { Redis } from "@upstash/redis";
 
-const redis = new Redis({
+// إنشاء عميل Redis (client)
+const redisClient = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// اختبار الاتصال البسيط (اختياري)
+// تصدير redis كـ named export (عشان resolve.js يقدر يستورده بـ { redis })
+// كمان، default export للتوافق مع imports أخرى
+export const redis = redisClient;
+export default redisClient;
+
+// اختبار الاتصال البسيط (اختياري - استخدمه للـ debug)
 export async function pingRedis() {
   return await redis.ping();
 }
@@ -25,5 +32,3 @@ export async function cacheDel(key) {
   await redis.del(key);
   return true;
 }
-
-export default redis;
