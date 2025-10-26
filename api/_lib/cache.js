@@ -1,3 +1,4 @@
+// api/_lib/cache.js
 import { Redis } from "@upstash/redis";
 
 export const redis = new Redis({
@@ -5,5 +6,12 @@ export const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-export const cacheGet = (k) => redis.get(k);
-export const cacheSet = (k, v, ttl = 300) => redis.set(k, v, { ex: ttl });
+export const cacheGet = async (k) => {
+  const value = await redis.get(k);
+  return value ? JSON.parse(value) : null;  // إضافة parse
+};
+
+export const cacheSet = async (k, v, ttl = 300) => {
+  await redis.set(k, JSON.stringify(v), { ex: ttl });  // إضافة stringify
+  return true;
+};
