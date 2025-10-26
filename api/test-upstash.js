@@ -1,5 +1,5 @@
 // api/test-upstash.js
-import { pingRedis } from "./_lib/upstash.js";
+import { pingRedis } from "../_lib/cache.js";  // غيّر من upstash.js إلى cache.js
 
 /**
  * Endpoint لفحص اتصال Upstash Redis
