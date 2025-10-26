@@ -1,4 +1,5 @@
 // api/bridge/register.js
+// ✅ نسخة كاملة مع DB + Cache + Logs للديباج + أمان (timingSafeEqual)
 import { hashKey, timingSafeEqual } from "../_lib/hmac.js";  // HMAC للـ hash و timing-safe check
 import { readJson } from "../_lib/read-json.js";  // قراءة JSON آمنة
 import { pool, ensureSchema } from "../_lib/db.js";  // DB للحفظ الدائم
