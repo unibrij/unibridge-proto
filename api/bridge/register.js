@@ -1,37 +1,43 @@
 // api/bridge/register.js
-// ✅ نسخة كاملة مع DB + Cache + Logs للديباج + أمان (timingSafeEqual)
-import { hashKey, timingSafeEqual } from "../_lib/hmac.js";  // HMAC للـ hash و timing-safe check
-import { readJson } from "../_lib/read-json.js";  // قراءة JSON آمنة
-import { pool, ensureSchema } from "../_lib/db.js";  // DB للحفظ الدائم
-import { cacheSet } from "../_lib/cache.js";  // Cache للأداء (async + JSON)
+import { cacheSet } from "../_lib/cache.js";
+import { hashKey } from "../_lib/hmac.js";
+
+function getHeader(req, name) {
+  const h = req.headers || {};
+  return h[name] || h[name.toLowerCase()] || h[name.toUpperCase()];
+}
+
+async function readJson(req, limitBytes = 1_000_000) {
+  if (req.body && typeof req.body === "object") return req.body;
+  const chunks = [];
+  let len = 0;
+  for await (const chunk of req) {
+    chunks.push(chunk);
+    len += chunk.length || chunk.byteLength || 0;
+    if (len > limitBytes) {
+      const e = new Error("body_too_large"); e.code = "BODY_TOO_LARGE"; throw e;
+    }
+  }
+  const text = Buffer.concat(chunks).toString("utf8").trim();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { throw new Error("invalid_json"); }
+}
 
 export default async function handler(req, res) {
-  // 1) السماح لـ POST فقط
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  // 2) تحقق x-api-key باستخدام timingSafeEqual للأمان (مع logs للديباج)
-  const headerKey = req.headers["x-api-key"];
-  const serverKey = process.env.API_KEY;
-  console.log("[register] Received header key:", headerKey || "undefined");  // ديباج: header
-  console.log("[register] Expected env key:", serverKey || "undefined");  // ديباج: env var
-  if (!serverKey || !headerKey) {
-    console.log("[register] Unauthorized: missing key");
+  const apiKeyHeader = getHeader(req, "x-api-key");
+  const API_KEY = process.env.API_KEY || process.env.CLIENT_KEY;
+  if (!API_KEY || !apiKeyHeader || String(apiKeyHeader) !== String(API_KEY)) {
     return res.status(401).json({ error: "unauthorized" });
   }
-  if (!timingSafeEqual(headerKey, serverKey)) {
-    console.log("[register] Unauthorized: mismatch");  // ديباج: عدم تطابق
-    return res.status(401).json({ error: "unauthorized" });
-  }
-  console.log("[register] API key validated OK");  // ديباج: نجاح
 
-  // 3) قراءة JSON بأمان
-  let body = {};
-  try {
-    body = await readJson(req);
-  } catch {
-    return res.status(400).json({ error: "invalid_json" });
+  let body;
+  try { body = await readJson(req); }
+  catch (e) {
+    return res.status(400).json({ error: e?.message || "invalid_json" });
   }
 
   const { key, wallet_id, anchor_id, provider_id } = body || {};
@@ -39,64 +45,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "missing_fields" });
   }
 
-  // 4) توليد بصمة المفتاح مع HMAC
-  const hmacSecret = process.env.HMAC_SECRET;  // تأكد من env var!
-  if (!hmacSecret) {
-    console.error("[register] HMAC_SECRET missing");
-    return res.status(500).json({ error: "config_error", detail: "HMAC_SECRET missing" });
-  }
-  let key_hash;
   try {
-    key_hash = hashKey(key, hmacSecret);
-  } catch (e) {
-    console.error("[register] Hash error:", e);
-    return res.status(500).json({ error: "hash_error", detail: String(e?.message || e) });
-  }
+    const keyHash = hashKey(key, process.env.HMAC_SECRET);
+    const record = { wallet_id, provider_id: provider_id || null, anchor_id };
+    // cache namespace: resolve:<keyHash>
+    await cacheSet(`resolve:${keyHash}`, record, 300);
 
-  // 5) ضمان الـ schema (مرة واحدة)
-  let dbSuccess = false;
-  try {
-    await ensureSchema();
-  } catch (e) {
-    console.error("[register] Schema init failed:", e);
-    // استمر، نفترض الجدول موجود
+    return res.status(201).json({ status: "created", key_hash: keyHash, wallet_id, anchor_id });
+  } catch (err) {
+    console.error("[register] error:", err);
+    return res.status(500).json({ error: "internal_error" });
   }
-
-  // 6) حفظ في DB (upsert)
-  try {
-    const result = await pool.query(`
-      INSERT INTO bkd_entries (key_hash, wallet_id, provider_id, anchor_id)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (key_hash) DO UPDATE SET
-        wallet_id = EXCLUDED.wallet_id,
-        provider_id = EXCLUDED.provider_id,
-        anchor_id = EXCLUDED.anchor_id,
-        updated_at = NOW()
-      RETURNING key_hash;
-    `, [key_hash, wallet_id, provider_id, anchor_id]);
-    dbSuccess = result.rows.length > 0;
-    console.log("[register] DB save OK:", dbSuccess);  // ديباج
-  } catch (e) {
-    console.error("[register] DB insert failed:", e);
-    // لا نفشل الـ request
-  }
-
-  // 7) حفظ في الكاش (مع TTL 300s)
-  const cacheData = { wallet_id, provider_id, anchor_id, status: 'active' };
-  try {
-    await cacheSet(`bridge:${key_hash}`, cacheData, 300);
-    console.log("[register] Cache set OK");  // ديباج
-  } catch (e) {
-    console.error("[register] Cache set failed:", e);
-    // لا نفشل هنا
-  }
-
-  // 8) ردّ النجاح
-  return res.status(dbSuccess ? 201 : 200).json({
-    status: "created",
-    key_hash,
-    wallet_id,
-    anchor_id,
-    persisted: dbSuccess  // للديباج
-  });
 }
