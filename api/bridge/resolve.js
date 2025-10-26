@@ -1,60 +1,49 @@
 // api/bridge/resolve.js
-// Unifies lookup key with register: compute the same key hash, then GET from Redis.
+import { redis, getJSON } from "../_lib/upstash.js";
+import crypto from "node:crypto";
 
-import { redis } from "../_lib/upstash.js";
-import { hashKey } from "../_lib/hmac.js";
-
-function getHeader(req, name) {
-  // Vercel/Node headers are case-insensitive
-  const h = req.headers || {};
-  return h[name] || h[name.toLowerCase()] || h[name.toUpperCase()];
+function json(res, code, body){
+  res.status(code).setHeader("content-type","application/json; charset=utf-8");
+  return res.end(JSON.stringify(body));
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "method_not_allowed" });
+function header(headers, name){
+  if(!headers) return undefined;
+  const n = name.toLowerCase();
+  for(const [k,v] of Object.entries(headers)){
+    if(k.toLowerCase()===n) return Array.isArray(v)?v[0]:v;
   }
+  return undefined;
+}
 
-  // API key check
-  const apiKey = getHeader(req, "x-api-key");
-  if (!apiKey || apiKey !== process.env.CLIENT_KEY) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
+function sha256Hex(s){
+  return crypto.createHash("sha256").update(Buffer.from(s??"", "utf8")).digest("hex");
+}
 
-  // Read key from query
-  const key = (req.query && (req.query.key || req.query["key"])) ?? null;
-  if (!key || typeof key !== "string" || key.trim().length === 0) {
-    return res.status(400).json({ error: "missing_key" });
-  }
+export default async function handler(req, res){
+  try{
+    if(req.method!=="GET"){ return json(res,405,{error:"method_not_allowed"}); }
 
-  try {
-    // Compute the same hash used on register
-    const keyHash = await hashKey(key);
-
-    // Fetch from Upstash Redis
-    const record = await redis.get(keyHash);
-
-    if (!record) {
-      return res.status(404).json({ error: "not found" });
+    const apiKeyHeader = header(req.headers,"x-api-key");
+    const API_KEY = process.env.API_KEY || process.env.CLIENT_KEY;
+    if(!API_KEY || !apiKeyHeader || String(apiKeyHeader)!==String(API_KEY)){
+      return json(res,401,{error:"unauthorized"});
     }
 
-    // If value was stored as JSON string, try to parse
-    let data = record;
-    if (typeof record === "string") {
-      try {
-        data = JSON.parse(record);
-      } catch (_) {
-        // keep as-is
-      }
-    }
+    const key = (req.query?.key || req.query?.k || "").toString().trim();
+    if(!key){ return json(res,400,{error:"missing_key"}); }
 
-    return res.status(200).json({
-      status: "resolved",
-      key,
-      ...data
-    });
-  } catch (err) {
-    console.error("resolve error:", err);
-    return res.status(500).json({ error: "internal_error" });
+    const k1 = `bridge:${key}`;
+    let record = await getJSON(k1);
+    if(!record){
+      const k2 = `bridge:${sha256Hex(key)}`;
+      record = await getJSON(k2);
+    }
+    if(!record){ return json(res,404,{error:"not_found"}); }
+
+    return json(res,200,{status:"resolved", key, ...record});
+  }catch(err){
+    console.error("[resolve] internal error:", err);
+    return json(res,500,{error:"internal_error"});
   }
 }
