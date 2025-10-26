@@ -15,3 +15,8 @@ export const cacheSet = async (k, v, ttl = 300) => {
   await redis.set(k, JSON.stringify(v), { ex: ttl });  // إضافة stringify
   return true;
 };
+
+// إضافة pingRedis للتوافق مع test-upstash (اختبار الاتصال)
+export async function pingRedis() {
+  return await redis.ping();
+}
