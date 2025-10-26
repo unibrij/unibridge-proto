@@ -1,5 +1,5 @@
 // api/bridge/resolve.js
-import { redis, cacheGet as getJSON } from "../_lib/upstash.js";
+import { cacheGet as getJSON } from "../_lib/upstash.js";  // أزلت redis لأنه غير مستخدم حاليًا (يمكن إضافته لو احتجت set أو غيره)
 import crypto from "node:crypto";
 
 // دالة موحدة لتنسيق الاستجابة بصيغة JSON
