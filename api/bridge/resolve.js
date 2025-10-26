@@ -1,5 +1,5 @@
 // api/bridge/resolve.js
-import { cacheGet } from "../_lib/cache.js";  // من cache.js المصحح (async + JSON.parse)
+import { cacheGet, cacheSet } from "../_lib/cache.js";  // من cache.js المصحح (async + JSON.parse) – إضافة cacheSet هنا
 import { pool, ensureSchema } from "../_lib/db.js";  // إضافة DB fallback
 import crypto from "node:crypto";
 import { hashKey, timingSafeEqual } from "../_lib/hmac.js";  // لـ HMAC و timing-safe check
@@ -79,9 +79,11 @@ export default async function handler(req, res) {
           record = dbResult.rows[0];
           // أعد الكاش للأداء المستقبلي (استخدم key_hash كـ key)
           const cacheKey = hmacSecret ? `bridge:${hashKey(key, hmacSecret)}` : k1;
-          // تصحيح: استخدم cacheSet بدلاً من cacheGet
-          import { cacheSet } from "../_lib/cache.js";
-          await cacheSet(cacheKey, record, 300);
+          try {
+            await cacheSet(cacheKey, record, 300);
+          } catch (cacheErr) {
+            console.error("[resolve] Cache repopulate failed:", cacheErr);
+          }
         }
       } catch (dbErr) {
         console.error("[resolve] DB fallback failed:", dbErr);
