@@ -7,6 +7,11 @@ export function hmacSHA256Hex(secret, message){
                .digest("hex");
 }
 
+// إضافة hashKey كـ alias للتوافق مع register.js (wrapper بسيط)
+export function hashKey(message, secret) {
+  return hmacSHA256Hex(secret, message);  // ترتيب البارامترات: secret أول، message ثاني
+}
+
 export function timingSafeEqual(a,b){
   const ab = Buffer.from(a??"", "utf8");
   const bb = Buffer.from(b??"", "utf8");
