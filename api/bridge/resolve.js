@@ -1,104 +1,42 @@
 // api/bridge/resolve.js
-import { cacheGet, cacheSet } from "../_lib/cache.js";  // من cache.js المصحح (async + JSON.parse) – إضافة cacheSet هنا
-import { pool, ensureSchema } from "../_lib/db.js";  // إضافة DB fallback
-import crypto from "node:crypto";
-import { hashKey, timingSafeEqual } from "../_lib/hmac.js";  // لـ HMAC و timing-safe check
+import { cacheGet } from "../_lib/cache.js";
+import { hashKey } from "../_lib/hmac.js";
 
-// دالة موحدة لتنسيق الاستجابة بصيغة JSON
-function json(res, code, body) {
-  res
-    .status(code)
-    .setHeader("content-type", "application/json; charset=utf-8");
-  return res.end(JSON.stringify(body));
+function getHeader(req, name) {
+  const h = req.headers || {};
+  return h[name] || h[name.toLowerCase()] || h[name.toUpperCase()];
 }
 
-// دالة لقراءة الهيدر بشكل آمن (case-insensitive)
-function header(headers, name) {
-  if (!headers) return undefined;
-  const n = name.toLowerCase();
-  for (const [k, v] of Object.entries(headers)) {
-    if (k.toLowerCase() === n) return Array.isArray(v) ? v[0] : v;
-  }
-  return undefined;
-}
-
-// 🔹 المعالج الرئيسي للـ endpoint
 export default async function handler(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "method_not_allowed" });
+  }
+
+  const apiKeyHeader = getHeader(req, "x-api-key");
+  const API_KEY = process.env.API_KEY || process.env.CLIENT_KEY;
+  if (!API_KEY || !apiKeyHeader || String(apiKeyHeader) !== String(API_KEY)) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  const key = (req.query?.key || req.query?.k || "").toString().trim();
+  if (!key) return res.status(400).json({ error: "missing_key" });
+
   try {
-    if (req.method !== "GET") {
-      return json(res, 405, { error: "method_not_allowed" });
+    const keyHash = hashKey(key, process.env.HMAC_SECRET);
+
+    // First: namespaced hash key
+    let record = await cacheGet(`resolve:${keyHash}`);
+
+    // Optional backward-compat: plain key (if older writes existed)
+    if (!record) {
+      record = await cacheGet(`resolve:${key}`);
     }
 
-    // ضمان الـ schema (مرة واحدة، لا يفشل إذا غاب DB)
-    try {
-      await ensureSchema();
-    } catch (e) {
-      console.error("[resolve] Schema init failed:", e);
-      // استمر بدون DB
-    }
+    if (!record) return res.status(404).json({ error: "not_found" });
 
-    // تحقق من مفتاح الـ API باستخدام timingSafeEqual للأمان
-    const apiKeyHeader = header(req.headers, "x-api-key");
-    const API_KEY = process.env.API_KEY || process.env.CLIENT_KEY;
-    if (!API_KEY || !apiKeyHeader) {
-      return json(res, 401, { error: "unauthorized" });
-    }
-    if (!timingSafeEqual(apiKeyHeader, API_KEY)) {
-      return json(res, 401, { error: "unauthorized" });
-    }
-
-    // استلام مفتاح bridge key المطلوب حله
-    const key = (req.query?.key || req.query?.k || "").toString().trim();
-    if (!key) return json(res, 400, { error: "missing_key" });
-
-    // الحصول على HMAC secret للـ fallback hash
-    const hmacSecret = process.env.HMAC_SECRET;
-    let record = null;
-
-    // تجربة البحث المباشر في الكاش
-    const k1 = `bridge:${key}`;
-    record = await cacheGet(k1);
-
-    // تجربة البحث عبر HMAC hash (للتوافق مع register)
-    if (!record && hmacSecret) {
-      const key_hash = hashKey(key, hmacSecret);
-      const k2 = `bridge:${key_hash}`;
-      record = await cacheGet(k2);
-    }
-
-    // إذا لم يوجد في الكاش، جرب DB fallback (إذا متوفر)
-    if (!record && pool) {
-      try {
-        // استخدم HMAC hash للبحث في DB (افتراض أن key_hash هو PRIMARY KEY)
-        const searchHash = hmacSecret ? hashKey(key, hmacSecret) : key;  // fallback إلى plain إذا غاب secret
-        const dbResult = await pool.query(
-          'SELECT * FROM bkd_entries WHERE key_hash = $1 AND status = $2',
-          [searchHash, 'active']
-        );
-        if (dbResult.rows.length > 0) {
-          record = dbResult.rows[0];
-          // أعد الكاش للأداء المستقبلي (استخدم key_hash كـ key)
-          const cacheKey = hmacSecret ? `bridge:${hashKey(key, hmacSecret)}` : k1;
-          try {
-            await cacheSet(cacheKey, record, 300);
-          } catch (cacheErr) {
-            console.error("[resolve] Cache repopulate failed:", cacheErr);
-          }
-        }
-      } catch (dbErr) {
-        console.error("[resolve] DB fallback failed:", dbErr);
-        // لا تفشل الـ request
-      }
-    }
-
-    // إذا لم يوجد أي تطابق
-    if (!record) return json(res, 404, { error: "not_found" });
-
-    // نجاح: إعادة السجل الكامل (مع إزالة sensitive fields إذا لزم، مثل updated_at)
-    const { updated_at, ...safeRecord } = record;  // اختياري: أزل updated_at إذا لا تريده
-    return json(res, 200, { status: "resolved", key, ...safeRecord });
+    return res.status(200).json({ status: "resolved", key, ...record });
   } catch (err) {
-    console.error("[resolve] internal error:", err);
-    return json(res, 500, { error: "internal_error", details: err.message });
+    console.error("[resolve] error:", err);
+    return res.status(500).json({ error: "internal_error" });
   }
 }
