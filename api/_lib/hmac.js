@@ -1,4 +1,8 @@
-import crypto from "node:crypto";
+// api/_lib/hmac.js
+// Simple SHA-256 key hashing to normalize storage/lookup keys.
 
-export const hashKey = (key, secret) =>
-  crypto.createHmac("sha256", secret).update(key).digest("hex");
+import crypto from "crypto";
+
+export async function hashKey(key) {
+  return crypto.createHash("sha256").update(String(key)).digest("hex");
+}
