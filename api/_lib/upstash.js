@@ -1,17 +1,24 @@
 // api/_lib/upstash.js
 import { Redis } from "@upstash/redis";
 
-// نأخذ من REDIS أولاً، وإن لم تتوفر نستخدم KV
-const url =
-  process.env.UPSTASH_REDIS_REST_URL || process.env.UPSTASH_KV_REST_URL;
-const token =
-  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.UPSTASH_KV_REST_TOKEN;
+function readEnv(keys){for(const k of keys){const v=process.env[k];if(v&&String(v).trim())return v;}return null;}
 
-if (!url || !token) {
-  throw new Error(
-    "Upstash credentials not found. Set UPSTASH_REDIS_REST_URL/TOKEN or UPSTASH_KV_REST_URL/TOKEN"
-  );
+const url = readEnv(["UPSTASH_REDIS_REST_URL","UPSTASH_KV_REST_URL","UPSTASH_KV_URL"]);
+const token = readEnv(["UPSTASH_REDIS_REST_TOKEN","UPSTASH_KV_REST_TOKEN","UPSTASH_KV_TOKEN"]);
+
+if(!url||!token){console.error("[upstash] Missing Upstash credentials. url? %s token? %s",!!url,!!token);}
+
+export const redis = new Redis({url, token});
+
+export async function getJSON(key){
+  const raw = await redis.get(key);
+  if(raw==null) return null;
+  if(typeof raw === "string"){ try{return JSON.parse(raw);}catch{return raw;} }
+  return raw;
 }
 
-export const redis = new Redis({
- url, token });
+export async function setJSON(key, value, opts){
+  const payload = typeof value === "string" ? value : JSON.stringify(value);
+  if(opts?.ex){ return await redis.set(key, payload, { ex: opts.ex }); }
+  return await redis.set(key, payload);
+}
