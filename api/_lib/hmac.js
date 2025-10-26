@@ -1,8 +1,20 @@
 // api/_lib/hmac.js
-// Simple SHA-256 key hashing to normalize storage/lookup keys.
+import crypto from "node:crypto";
 
-import crypto from "crypto";
+export function hmacSHA256Hex(secret, message){
+  return crypto.createHmac("sha256", Buffer.from(secret??"", "utf8"))
+               .update(Buffer.from(message??"", "utf8"))
+               .digest("hex");
+}
 
-export async function hashKey(key) {
-  return crypto.createHash("sha256").update(String(key)).digest("hex");
+export function timingSafeEqual(a,b){
+  const ab = Buffer.from(a??"", "utf8");
+  const bb = Buffer.from(b??"", "utf8");
+  if(ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+export function verifyHmac(secret, message, expectedHex){
+  const sig = hmacSHA256Hex(secret, message);
+  return timingSafeEqual(sig, expectedHex);
 }
