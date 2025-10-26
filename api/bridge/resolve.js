@@ -1,50 +1,60 @@
 // api/bridge/resolve.js
-// ✅ Lite: تعتمد على الكاش فقط (Upstash إن وُجد). بدون DB.
-// تُعيد 404 إذا لم تجد السجل في الكاش.
-// تعمل مع register-lite الذي يخزّن عند المفتاح: resolve:<key_hash>
+// Unifies lookup key with register: compute the same key hash, then GET from Redis.
 
+import { redis } from "../_lib/upstash.js";
 import { hashKey } from "../_lib/hmac.js";
 
+function getHeader(req, name) {
+  // Vercel/Node headers are case-insensitive
+  const h = req.headers || {};
+  return h[name] || h[name.toLowerCase()] || h[name.toUpperCase()];
+}
+
 export default async function handler(req, res) {
-  // 1) GET فقط
   if (req.method !== "GET") {
     return res.status(405).json({ error: "method_not_allowed" });
   }
 
-  // 2) تحقق من x-api-key
-  const headerKey = req.headers["x-api-key"];
-  const serverKey = process.env.API_KEY;
-  if (!serverKey || headerKey !== serverKey) {
+  // API key check
+  const apiKey = getHeader(req, "x-api-key");
+  if (!apiKey || apiKey !== process.env.CLIENT_KEY) {
     return res.status(401).json({ error: "unauthorized" });
   }
 
-  // 3) بارامتر key
-  const key = req.query?.key;
-  if (!key) return res.status(400).json({ error: "missing_key" });
-
-  // 4) احسب نفس key_hash المستخدم في register-lite
-  const hmacSecret = process.env.HMAC_SECRET || "temp-secret";
-  let key_hash;
-  try {
-    key_hash = hashKey(key, hmacSecret);
-  } catch (e) {
-    return res.status(500).json({ error: "hash_error", detail: String(e?.message || e) });
+  // Read key from query
+  const key = (req.query && (req.query.key || req.query["key"])) ?? null;
+  if (!key || typeof key !== "string" || key.trim().length === 0) {
+    return res.status(400).json({ error: "missing_key" });
   }
 
-  // 5) جرّب القراءة من الكاش (اختياري؛ لا نفشل إن لم يكن مضبوطًا)
   try {
-    const mod = await import("../_lib/cache.js").catch(() => null);
-    const cacheGet = mod?.cacheGet;
-    if (cacheGet) {
-      const cached = await cacheGet(`resolve:${key_hash}`);
-      if (cached) {
-        return res.status(200).json(cached);
+    // Compute the same hash used on register
+    const keyHash = await hashKey(key);
+
+    // Fetch from Upstash Redis
+    const record = await redis.get(keyHash);
+
+    if (!record) {
+      return res.status(404).json({ error: "not found" });
+    }
+
+    // If value was stored as JSON string, try to parse
+    let data = record;
+    if (typeof record === "string") {
+      try {
+        data = JSON.parse(record);
+      } catch (_) {
+        // keep as-is
       }
     }
-  } catch (e) {
-    console.log("cacheGet failed:", e?.message || e);
-  }
 
-  // 6) لا توجد DB في النسخة Lite
-  return res.status(404).json({ error: "not_found" });
+    return res.status(200).json({
+      status: "resolved",
+      key,
+      ...data
+    });
+  } catch (err) {
+    console.error("resolve error:", err);
+    return res.status(500).json({ error: "internal_error" });
+  }
 }
