@@ -1,25 +1,23 @@
 // api/_lib/hmac.js
 import crypto from "node:crypto";
 
-export function hmacSHA256Hex(secret, message){
-  return crypto.createHmac("sha256", Buffer.from(secret??"", "utf8"))
-               .update(Buffer.from(message??"", "utf8"))
-               .digest("hex");
+/**
+ * If a secret is provided, returns HMAC-SHA256(key, secret) hex.
+ * Otherwise returns SHA-256(key) hex.
+ */
+export function hashKey(key, secret) {
+  const msg = Buffer.from(String(key ?? ""), "utf8");
+  if (secret && String(secret).length > 0) {
+    return crypto.createHmac("sha256", Buffer.from(String(secret), "utf8"))
+                 .update(msg).digest("hex");
+  }
+  return crypto.createHash("sha256").update(msg).digest("hex");
 }
 
-// إضافة hashKey كـ alias للتوافق مع register.js (wrapper بسيط)
-export function hashKey(message, secret) {
-  return hmacSHA256Hex(secret, message);  // ترتيب البارامترات: secret أول، message ثاني
-}
-
-export function timingSafeEqual(a,b){
-  const ab = Buffer.from(a??"", "utf8");
-  const bb = Buffer.from(b??"", "utf8");
-  if(ab.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ab, bb);
-}
-
-export function verifyHmac(secret, message, expectedHex){
-  const sig = hmacSHA256Hex(secret, message);
-  return timingSafeEqual(sig, expectedHex);
+/** Optional: timing-safe string compare (same-length only). */
+export function timingSafeEqual(a, b) {
+  const A = Buffer.from(String(a ?? ""), "utf8");
+  const B = Buffer.from(String(b ?? ""), "utf8");
+  if (A.length !== B.length) return false;
+  return crypto.timingSafeEqual(A, B);
 }
