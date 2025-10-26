@@ -1,20 +1,29 @@
-// api/test-upstash.js
-import { pingRedis } from "./_lib/upstash.js";
+import { Redis } from "@upstash/redis";
 
-export default async function handler(req, res) {
-  try {
-    const result = await pingRedis();
-    return res.status(200).json({
-      status: "success",
-      message: "Redis connection OK",
-      result,
-    });
-  } catch (error) {
-    console.error("[test-upstash] Error:", error);
-    return res.status(500).json({
-      status: "error",
-      message: "Redis connection failed",
-      details: error.message || error.toString(),
-    });
-  }
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
+// اختبار الاتصال البسيط (اختياري)
+export async function pingRedis() {
+  return await redis.ping();
 }
+
+// دوال الكاش العامة
+export async function cacheSet(key, value) {
+  await redis.set(key, JSON.stringify(value));
+  return true;
+}
+
+export async function cacheGet(key) {
+  const value = await redis.get(key);
+  return value ? JSON.parse(value) : null;
+}
+
+export async function cacheDel(key) {
+  await redis.del(key);
+  return true;
+}
+
+export default redis;
