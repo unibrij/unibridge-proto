@@ -1,7 +1,7 @@
 import { pool, ensureSchema } from "../_lib/db.js";
-import { hashKey } from "../../_lib/hmac.js";
-import { cacheSet } from "../../_lib/cache.js";
-import { readJson } from "../../_lib/read-json.js";
+import { hashKey } from "../_lib/hmac.js";
+import { cacheSet } from "../_lib/cache.js";
+import { readJson } from "../_lib/read-json.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
