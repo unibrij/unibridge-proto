@@ -1,5 +1,5 @@
 // api/_lib/cache.js
-import redis from "./upstash.js";
+import { redis } from "./upstash.js";
 
 /**
  * Set a JSON-safe value in Redis.
