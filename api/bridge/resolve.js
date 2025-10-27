@@ -1,5 +1,5 @@
 // api/bridge/resolve.js
-import { redis } from "../_lib/upstash.js";
+import { redis } from "../_lib/upstash.mjs";
 import { hashKey } from "../_lib/hmac.js";
 
 export default async function handler(req, res) {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 }
 EOFcat > api/bridge/resolve.js <<'EOF'
 // api/bridge/resolve.js
-import { redis } from "../_lib/upstash.js";
+import { redis } from "../_lib/upstash.mjs";
 import { hashKey } from "../_lib/hmac.js";
 
 export default async function handler(req, res) {

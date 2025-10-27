@@ -1,4 +1,4 @@
-import { redis } from "./upstash.js";
+import { redis } from "./upstash.mjs";
 
 export async function cacheSet(key, value, ttlSec = 3600) {
   return await redis.set(key, JSON.stringify(value), { ex: ttlSec });
