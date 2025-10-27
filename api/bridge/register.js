@@ -1,4 +1,4 @@
-import { pool, ensureSchema } from "../../_lib/db.js";
+import { pool, ensureSchema } from "../_lib/db.js";
 import { hashKey } from "../../_lib/hmac.js";
 import { cacheSet } from "../../_lib/cache.js";
 import { readJson } from "../../_lib/read-json.js";
