@@ -8,7 +8,7 @@ if (!url || !token) {
   throw new Error("Missing Upstash Redis credentials");
 }
 
-const redis = new Redis({ url, token });
+
 
 console.log("[upstash] ✅ Connected to Upstash");
 
