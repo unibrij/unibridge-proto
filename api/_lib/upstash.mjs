@@ -1,21 +1,15 @@
 import { Redis } from "@upstash/redis";
 
-/* خُيارات القراءة من الـ ENV (أي واحد متوفر) */
+let _client;
+
 const url =
-  process.env.UPSTASH_REDIS_REST_URL ||
-  process.env.KV_REST_API_URL ||
-  process.env.REDIS_URL;
-
+  process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const token =
-  process.env.UPSTASH_REDIS_REST_TOKEN ||
-  process.env.KV_REST_API_TOKEN;
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
-/* إن ما في مفاتيح على الإنتاج منستخدم ستَب صغيرة بدل الكلاينت */
-const stub = {
-  async get() { return null; },
-  async set() { return "ok"; },
-  async del() { return 1; },
-};
+if (!url || !token) {
+  // اترك السطر يتابع؛ بيئة الإنتاج عندك مهيئة، لكن لو فشلت رجّع خطأ واضح
+  throw new Error("Upstash credentials not found (URL/TOKEN).");
+}
 
-export const redis = (url && token) ? new Redis({ url, token }) : stub;
-export default redis;
+export const redis = (_client ??= new Redis({ url, token }));
