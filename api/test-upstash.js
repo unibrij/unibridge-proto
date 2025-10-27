@@ -1,4 +1,4 @@
-import redis, { pingRedis } from "./_lib/upstash.js";
+import redis, { pingRedis } from "./_lib/upstash.mjs";
 
 export default async function handler(req, res) {
   try {
