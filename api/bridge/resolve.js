@@ -1,59 +1,34 @@
-// api/bridge/resolve.js
-import { redis } from "../_lib/upstash.mjs";
-import { hashKey } from "../_lib/hmac.js";
+import { redis } from "../_lib/upstash.js";
+import { readJson } from "../_lib/read-json.js";
 
 export default async function handler(req, res) {
-  const { key } = req.query;
-  const headerKey = req.headers["x-api-key"];
-  const serverKey = process.env.API_KEY;
-
-  if (!headerKey || headerKey !== serverKey)
-    return res.status(401).json({ error: "unauthorized" });
-
-  if (!key)
-    return res.status(400).json({ error: "missing key" });
-
-  try {
-    // 🔹 نستخدم نفس التجزئة كما في register.js
-    const keyHash = await hashKey(key);
-    const result = await redis.get(keyHash);
-
-    if (!result)
-      return res.status(404).json({ error: "not found" });
-
-    return res.status(200).json({ ok: true, result });
-  } catch (err) {
-    console.error("[resolve]", err);
-    return res.status(500).json({ error: "server_error", detail: err.message });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "method_not_allowed" });
   }
-}
-EOFcat > api/bridge/resolve.js <<'EOF'
-// api/bridge/resolve.js
-import { redis } from "../_lib/upstash.mjs";
-import { hashKey } from "../_lib/hmac.js";
 
-export default async function handler(req, res) {
-  const { key } = req.query;
-  const headerKey = req.headers["x-api-key"];
-  const serverKey = process.env.API_KEY;
-
-  if (!headerKey || headerKey !== serverKey)
+  if (req.headers["x-api-key"] !== process.env.API_KEY) {
     return res.status(401).json({ error: "unauthorized" });
+  }
 
-  if (!key)
-    return res.status(400).json({ error: "missing key" });
+  let body;
+  try {
+    body = await readJson(req);
+  } catch {
+    return res.status(400).json({ error: "invalid_json" });
+  }
+
+  const { key } = body || {};
+  if (!key) {
+    return res.status(400).json({ error: "missing_key" });
+  }
 
   try {
-    // 🔹 نستخدم نفس التجزئة كما في register.js
-    const keyHash = await hashKey(key);
-    const result = await redis.get(keyHash);
+    const result = await redis.get(key);
+    if (!result) return res.status(404).json({ error: "not_found" });
 
-    if (!result)
-      return res.status(404).json({ error: "not found" });
-
-    return res.status(200).json({ ok: true, result });
+    return res.status(200).json({ ok: true, resolved: JSON.parse(result) });
   } catch (err) {
-    console.error("[resolve]", err);
-    return res.status(500).json({ error: "server_error", detail: err.message });
+    console.error("[resolve] Redis error:", err);
+    return res.status(500).json({ error: "internal_error" });
   }
 }
