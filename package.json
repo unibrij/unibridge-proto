@@ -2,22 +2,16 @@
   "name": "unibridge-proto",
   "version": "1.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "vercel dev",
-    "build": "echo 'No build step needed for API project.'",
-    "start": "node api/index.js"
-  },
-  "dependencies": {
-    "@upstash/redis": "^1.35.6",
-    "@vercel/postgres": "^0.10.0",
-    "express": "^5.1.0",
-    "swagger-ui-express": "^5.0.1"
-  },
   "engines": {
     "node": "22.x"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/index.js",
+    "build": "echo 'No build step needed for API project.'"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.29.0",
+    "pg": "^8.11.0"
   }
-}
-,
-"engines": {
-  "node": "22.x"
 }
