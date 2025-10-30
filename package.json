@@ -1,17 +1,19 @@
 {
   "name": "unibridge-proto",
   "version": "1.0.0",
-  "type": "module",
-  "engines": {
-    "node": "22.x"
-  },
+  "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "node api/index.js",
-    "build": "echo 'No build step needed for API project.'"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
   "dependencies": {
-    "@upstash/redis": "^1.29.0",
-    "pg": "^8.11.0"
-  }
+    "@upstash/redis": "^1.35.6",
+    "@vercel/postgres": "^0.10.0",
+    "express": "^5.1.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "description": ""
 }
