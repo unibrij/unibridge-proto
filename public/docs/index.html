@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>UniBridge API Docs (Prototype)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="robots" content="noindex"/>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css"/>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Roboto, sans-serif; }
+    .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/openapi-public.yaml',
+      dom_id: '#swagger',
+      docExpansion: 'list',
+      deepLinking: true,
+      supportedSubmitMethods: ['get','post'],
+      requestInterceptor: (req) => {
+        // مهم: ما عم نحقن x-api-key تلقائياً.
+        // الشخص اللي عم يختبر لازم يحط header بنفسه.
+        return req;
+      }
+    });
+  </script>
+</body>
+</html>

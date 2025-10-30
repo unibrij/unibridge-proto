@@ -1,0 +1,60 @@
+openapi: 3.1.0
+info:
+  title: UniBridge Bridge Directory — Public API
+  version: 0.1.0
+  description: >
+    Functional prototype for UniBridge Bridge Key Directory (BKD).
+    This spec is sanitized. No credentials or partner logic are exposed.
+servers:
+  - url: https://unibridge-proto-v2.vercel.app/api/bridge
+paths:
+  /register:
+    post:
+      summary: Register a bridge entry
+      security: [{ ApiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value, asset, network]
+              properties:
+                key:
+                  type: string
+                  description: "Unique identifier to bind (ex: wallet handle)"
+                value:
+                  type: string
+                  description: "Destination or address to resolve to"
+                asset:
+                  type: string
+                  description: "Token / asset code (ex: USDC)"
+                network:
+                  type: string
+                  description: "Network identifier (ex: Stellar)"
+      responses:
+        "200": { description: Stored successfully }
+        "401": { description: Invalid or missing x-api-key }
+        "405": { description: Method not allowed }
+  /resolve:
+    get:
+      summary: Resolve a bridge entry
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+            description: "Key previously registered"
+      responses:
+        "200": { description: Found / returns mapping }
+        "404": { description: Not found }
+        "401": { description: Invalid or missing x-api-key }
+        "405": { description: Method not allowed }
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
