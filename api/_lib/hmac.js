@@ -1,23 +1,15 @@
-// api/_lib/hmac.js
-import crypto from "node:crypto";
+import { createHmac, timingSafeEqual as tse } from "crypto";
 
-/**
- * If a secret is provided, returns HMAC-SHA256(key, secret) hex.
- * Otherwise returns SHA-256(key) hex.
- */
-export function hashKey(key, secret) {
-  const msg = Buffer.from(String(key ?? ""), "utf8");
-  if (secret && String(secret).length > 0) {
-    return crypto.createHmac("sha256", Buffer.from(String(secret), "utf8"))
-                 .update(msg).digest("hex");
-  }
-  return crypto.createHash("sha256").update(msg).digest("hex");
+/** يولّد هاش ثابت من المفتاح المرسل */
+export function hashKey(key) {
+  const secret = process.env.API_KEY || "dev-secret";
+  return createHmac("sha256", secret).update(String(key)).digest("hex");
 }
 
-/** Optional: timing-safe string compare (same-length only). */
+/** مقارنة آمنة زمنيًا لسلاسل/بفرات */
 export function timingSafeEqual(a, b) {
-  const A = Buffer.from(String(a ?? ""), "utf8");
-  const B = Buffer.from(String(b ?? ""), "utf8");
-  if (A.length !== B.length) return false;
-  return crypto.timingSafeEqual(A, B);
+  const aBuf = Buffer.from(String(a));
+  const bBuf = Buffer.from(String(b));
+  if (aBuf.length !== bBuf.length) return false;
+  try { return tse(aBuf, bBuf); } catch { return false; }
 }
