@@ -1,6 +1,6 @@
 // api/bridge/resolve.js
-import { cacheGet } from "../../_lib/cache.js";
-import { hashKey } from "../../_lib/hmac.js";
+import { cacheGet } from "../_lib/cache.js";
+import { hashKey } from "../_lib/hmac.js";
 
 function getHeader(req, name) {
   const h = req.headers || {};
