@@ -1,16 +1,43 @@
-import { redis } from "./upstash.mjs";
+// api/_lib/cache.js
+import { redis } from "./upstash.js";
 
-export async function cacheSet(key, value, ttlSec = 3600) {
-  return await redis.set(key, JSON.stringify(value), { ex: ttlSec });
+/**
+ * Store value in cache.
+ * @param {string} key
+ * @param {any} value
+ * @param {number} [ttlSec] optional TTL in seconds
+ */
+export async function cacheSet(key, value, ttlSec) {
+  if (!redis) {
+    throw new Error("redis client not initialized");
+  }
+
+  const payload = typeof value === "string" ? value : JSON.stringify(value);
+
+  if (ttlSec && Number(ttlSec) > 0) {
+    await redis.set(key, payload, { ex: Number(ttlSec) });
+  } else {
+    await redis.set(key, payload);
+  }
+
+  return true;
 }
 
+/**
+ * Read value from cache and JSON.parse if needed.
+ * @param {string} key
+ */
 export async function cacheGet(key) {
-  const data = await redis.get(key);
-  try { return JSON.parse(data); } catch { return data; }
-}
+  if (!redis) {
+    throw new Error("redis client not initialized");
+  }
 
-export async function cacheDel(key) {
-  return await redis.del(key);
-}
+  const raw = await redis.get(key);
+  if (raw === null || raw === undefined) return null;
 
-export default { cacheSet, cacheGet, cacheDel };
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
