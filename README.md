@@ -177,7 +177,7 @@ with selected **Stellar anchors** to validate the production model.
 ## 💼 Contact & Access
 
 **UniBridge Technologies Inc.**  
-🌐 [unibridge.tech](https://unibrij.io)  
+🌐 [unibrij.io](https://unibrij.io)  
 📧 ceo@unibrij.io  
 
 For sandbox credentials or API access invitations,  
