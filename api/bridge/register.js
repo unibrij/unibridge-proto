@@ -1,6 +1,6 @@
 // api/bridge/resolve.js
-import { cacheGet } from "../../_lib/cache.js";
-import { applyCors } from "../../_lib/cors.js";
+import { cacheGet } from "../_lib/cache.js";
+import { applyCors } from "../_lib/cors.js";
 
 function getHeader(req, name) {
   const h = req.headers || {};
