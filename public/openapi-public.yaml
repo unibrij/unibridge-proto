@@ -1,0 +1,208 @@
+openapi: 3.1.0
+info:
+  title: UniBridge Bridge Directory — Public API
+  version: 0.1.0
+  description: >
+    Functional prototype for UniBridge Bridge Key Directory (BKD).
+    This spec is sanitized. No credentials or partner logic are exposed.
+
+servers:
+  - url: https://unibridge-proto-v2.vercel.app/api/bridge
+
+paths:
+  /register:
+    post:
+      summary: Register a bridge entry
+      security: [{ ApiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value, asset, network]
+              properties:
+                key:
+                  type: string
+                  description: "Unique identifier to bind (ex: wallet handle)"
+                value:
+                  type: string
+                  description: "Destination or address to resolve to"
+                asset:
+                  type: string
+                  description: "Token / asset code (ex: USDC)"
+                network:
+                  type: string
+                  description: "Network identifier (ex: Stellar)"
+      responses:
+        "200": { description: Stored successfully }
+        "401": { description: Invalid or missing x-api-key }
+        "405": { description: Method not allowed }
+
+  /resolve:
+    get:
+      summary: Resolve a bridge entry
+      security: [{ ApiKeyAuth: [] }]
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+            description: "Key previously registered"
+      responses:
+        "200": { description: Found / returns mapping }
+        "404": { description: Not found }
+        "401": { description: Invalid or missing x-api-key }
+        "405": { description: Method not allowed }
+
+  /bridge/route-quote:
+    post:
+      tags:
+        - Bridge
+      summary: Get corridor quote and route (US→MX pilot)
+      description: |
+        Returns an estimated payout and routing path for a USD→MXN transfer.
+        This endpoint is live and enforces x-api-key, but pricing/fees are static placeholders until full partner integration.
+        Corridor: US -> MX.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - source
+                - destination
+              properties:
+                source:
+                  type: object
+                  required:
+                    - currency
+                    - amount
+                    - country
+                  properties:
+                    currency:
+                      type: string
+                      example: "USD"
+                    amount:
+                      type: number
+                      example: 100
+                    country:
+                      type: string
+                      example: "US"
+                destination:
+                  type: object
+                  required:
+                    - currency
+                    - country
+                    - receiver_key
+                  properties:
+                    currency:
+                      type: string
+                      example: "MXN"
+                    country:
+                      type: string
+                      example: "MX"
+                    receiver_key:
+                      type: string
+                      description: Bridge Key or payout handle of the receiver
+                      example: "+52-55-1234-5678"
+                partner_id:
+                  type: string
+                  description: Corridor / integration hint
+                  example: "corridor_US_MX_v1"
+            example:
+              source:
+                currency: "USD"
+                amount: 100
+                country: "US"
+              destination:
+                currency: "MXN"
+                country: "MX"
+                receiver_key: "+52-55-1234-5678"
+              partner_id: "corridor_US_MX_v1"
+      responses:
+        "200":
+          description: Successful quote
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote_id:
+                    type: string
+                    example: "qt_usmx_1761956040067"
+                  corridor:
+                    type: string
+                    example: "US->MX"
+                  partner_id:
+                    type: string
+                    example: "corridor_US_MX_v1"
+                  amount_in:
+                    type: number
+                    example: 100
+                  amount_out:
+                    type: number
+                    example: 1703.16
+                  fx_rate:
+                    type: number
+                    example: 17.1
+                  total_fees:
+                    type: number
+                    description: Total fees applied in sender currency
+                    example: 0.4
+                  unibridge_fee_bps:
+                    type: number
+                    description: UniBridge fee in basis points (10 = 0.1%)
+                    example: 10
+                  valid_for_seconds:
+                    type: integer
+                    example: 120
+                  estimated_settlement_seconds:
+                    type: integer
+                    example: 60
+                  path:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - "Circle_USDC"
+                      - "Stellar_USDC"
+                      - "Bitso_MXN"
+                      - "MX_Payout"
+                  note:
+                    type: string
+                    example: "Live-static US→MX corridor quote. FX/fees are placeholders."
+              example:
+                quote_id: "qt_usmx_1761956040067"
+                corridor: "US->MX"
+                partner_id: "corridor_US_MX_v1"
+                amount_in: 100
+                amount_out: 1703.16
+                fx_rate: 17.1
+                total_fees: 0.4
+                unibridge_fee_bps: 10
+                valid_for_seconds: 120
+                estimated_settlement_seconds: 60
+                path:
+                  - "Circle_USDC"
+                  - "Stellar_USDC"
+                  - "Bitso_MXN"
+                  - "MX_Payout"
+                note: "Live-static US→MX corridor quote. FX/fees are placeholders."
+        "400":
+          description: Missing required fields in request body
+        "401":
+          description: Unauthorized (x-api-key missing or invalid)
+        "405":
+          description: Method not allowed (only POST is supported)
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
