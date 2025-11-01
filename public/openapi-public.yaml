@@ -56,7 +56,7 @@ paths:
         "401": { description: Invalid or missing x-api-key }
         "405": { description: Method not allowed }
 
-  /bridge/route-quote:
+  /route-quote:
     post:
       tags:
         - Bridge
