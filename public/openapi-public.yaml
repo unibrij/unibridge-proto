@@ -1,0 +1,222 @@
+openapi: 3.0.3
+info:
+  title: UniBridge Protocol API (Public)
+  description: >
+    Public-facing Swagger specification for UniBridge Functional Prototype.
+    Includes endpoints for registration, resolution, quoting, settlement, and cross-anchor confirmation.
+  version: "0.9.5-sandbox"
+servers:
+  - url: https://unibridge-proto-v2.vercel.app/api
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /bridge/route-quote:
+    post:
+      summary: Get corridor quote and settlement path
+      description: >
+        Returns a temporary FX/fee quote and how the value will be delivered
+        from sender to receiver. The quote is bound to a specific receiver_key
+        and expires shortly (TTL). The response also indicates whether the
+        settlement can be completed "internal" (same anchor network both ends)
+        or will require "inter-anchor" handoff.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, destination, corridor]
+              properties:
+                source:
+                  type: object
+                  required: [amount, currency, sender_key]
+                  properties:
+                    amount:
+                      type: string
+                      example: "100.00"
+                    currency:
+                      type: string
+                      example: "USD"
+                    sender_key:
+                      type: string
+                      example: "bkd:us_john774"
+                    country:
+                      type: string
+                      example: "US"
+                destination:
+                  type: object
+                  required: [currency, receiver_key]
+                  properties:
+                    currency:
+                      type: string
+                      example: "MXN"
+                    receiver_key:
+                      type: string
+                      example: "bkd:mx_luis333"
+                    country:
+                      type: string
+                      example: "MX"
+                corridor:
+                  type: string
+                  example: "US->MX"
+                partner_id:
+                  type: string
+                  example: "corridor_US_MX_v1"
+      responses:
+        "200":
+          description: Quote created and cached (temporary)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote_id:
+                    type: string
+                    example: "qt_usmx_1762049532431"
+                  corridor:
+                    type: string
+                    example: "US->MX"
+                  receiver_key:
+                    type: string
+                    example: "bkd:mx_luis333"
+                  settlement_mode:
+                    type: string
+                    enum: ["internal", "inter-anchor"]
+                    example: "internal"
+                  amount_in:
+                    type: string
+                    example: "100.00"
+                  amount_out:
+                    type: string
+                    example: "1648.05"
+                  fx_rate:
+                    type: number
+                    example: 16.74
+                  total_fees:
+                    type: string
+                    example: "1.55"
+                  note:
+                    type: string
+                    example: "Live-static US->MX corridor quote."
+        "400":
+          description: Missing required fields
+        "401":
+          description: Invalid or missing API key
+
+  /bridge/settle:
+    post:
+      summary: Execute settlement for an accepted quote
+      description: >
+        Triggers settlement for a given quote. Can result in "completed_internal"
+        or "pending_anchor_confirmation" depending on whether both ends share the same anchor.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quote_id, sender_key, receiver_key]
+              properties:
+                quote_id:
+                  type: string
+                  example: "qt_usmx_1762049532431"
+                sender_key:
+                  type: string
+                  example: "bkd:us_john774"
+                receiver_key:
+                  type: string
+                  example: "bkd:mx_luis333"
+      responses:
+        "200":
+          description: Settlement response (sandbox / mock execution)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settlement_id:
+                    type: string
+                    example: "stl_17620498559834"
+                  status:
+                    type: string
+                    example: "completed_internal"
+                  corridor:
+                    type: string
+                    example: "US->MX"
+                  receiver_key:
+                    type: string
+                    example: "bkd:mx_luis333"
+                  settlement_mode:
+                    type: string
+                    enum: ["internal", "inter-anchor"]
+                    example: "internal"
+                  note:
+                    type: string
+                    example: "Settlement completed within same anchor network."
+        "400":
+          description: Missing required fields
+        "401":
+          description: Invalid or missing API key
+
+  /bridge/confirm-settlement:
+    post:
+      summary: Confirm final payout for an inter-anchor settlement
+      description: >
+        Called by the receiving anchor to signal that funds have been delivered
+        to the destination beneficiary. This upgrades a settlement from
+        "pending_anchor_confirmation" to "completed_cross_anchor".
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settlement_id, receiver_key]
+              properties:
+                settlement_id:
+                  type: string
+                  example: "stl_1762049385850"
+                receiver_key:
+                  type: string
+                  example: "bkd:br_lucas901"
+                anchor_conf_ref:
+                  type: string
+                  example: "BRL-LEDGER-REF#9988"
+      responses:
+        "200":
+          description: Cross-anchor settlement completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settlement_id:
+                    type: string
+                    example: "stl_1762049385850"
+                  status:
+                    type: string
+                    example: "completed_cross_anchor"
+                  receiver_key:
+                    type: string
+                    example: "bkd:br_lucas901"
+                  anchor_confirmation_ref:
+                    type: string
+                    example: "BRL-LEDGER-REF#9988"
+                  note:
+                    type: string
+                    example: "Final confirmation received from receiving anchor."
